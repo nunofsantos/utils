@@ -1,5 +1,19 @@
 #!/bin/bash
 
+if [ $# -eq 1 ] && [ $1 == "-h" ]; then
+    echo "Usage: githubmirror.sh [-refresh] [-h]"
+    echo "  no options : mirror repos in repolist"
+    echo "  -refresh   : force refresh of repo list from github"
+    echo "  -h         : display usage"
+    exit
+fi
+
+basedir="redhat-openstack"
+
+if [ ! -d "$basedir" ]; then
+    mkdir $basedir
+fi
+
 function mirror {
     if [ $# -ne 2 ]; then
 	echo "Usage: mirror <remote.git> <local.git>"
@@ -8,7 +22,7 @@ function mirror {
     remote=$1
     local=$2
 
-    echo "Mirroring from $remote to $local"
+    echo "Mirroring from $remote to $local..."
 
     if [ -d "$local" ]; then
 	git --git-dir=$local remote update
@@ -18,20 +32,19 @@ function mirror {
 }
 
 function getrepolist {
-    repolist=`wget -O - https://github.com/redhat-openstack | \
+    wget -O - https://github.com/$basedir | \
     grep "<a href=\"/redhat-openstack/" | \
     grep -v "Stargazers" | \
     grep -v "Forks" | \
     grep -v "/repositories" | \
-    sed 's:<a href="/redhat-openstack/\(.*\)">.*</a>:\1:'`
+    sed 's:<a href="/redhat-openstack/\(.*\)">.*</a>:\1:' > $basedir/repolist
 }
 
-if [ ! -d "redhat-openstack" ]; then
-    mkdir redhat-openstack
+if [ $# -eq 1 ] && [ $1 == "-refresh" ] || [ ! -f "$basedir/repolist" ] ; then
+    echo "Refreshing redhat-openstack repo list from GitHub..."
+    getrepolist
 fi
 
-getrepolist
-
-for r in $repolist; do
-  mirror git://github.com/redhat-openstack/$r.git redhat-openstack/$r
+for r in `cat $basedir/repolist`; do
+  mirror git://github.com/$basedir/$r.git $basedir/$r
 done
